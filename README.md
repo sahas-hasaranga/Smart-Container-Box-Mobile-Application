@@ -54,6 +54,16 @@ Built with performance and aesthetics in mind, the app features a responsive **G
 
 ---
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="assets/screenshot1.png" width="45%" alt="Dashboard Screenshot" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/screenshot2.png" width="45%" alt="Camera Tab Screenshot" />
+</p>
+
+---
+
 ## 🏗️ System Architecture
 
 The ecosystem relies on three main components communicating in real-time:
