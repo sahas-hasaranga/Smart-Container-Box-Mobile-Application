@@ -1,57 +1,131 @@
-# 📦 Smart Container Box Mobile Application
+<div align="center">
+  
+  # 📦 Smart Container Box Mobile Application
 
-A professional, feature-rich Flutter mobile application designed to monitor and manage a Smart Container Box in real-time. This application interfaces with an ESP32-CAM and a suite of IoT sensors via Firebase, providing live telemetry, video streaming, and GPS tracking.
+  <p align="center">
+    <strong>A next-generation IoT solution for real-time monitoring and tracking of Smart Container Boxes.</strong>
+  </p>
+  
+  <p align="center">
+    <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
+    <img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" />
+    <img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" />
+    <img src="https://img.shields.io/badge/ESP32-E7352C?style=for-the-badge&logo=espressif&logoColor=white" alt="ESP32" />
+  </p>
+
+</div>
+
+---
+
+## 📑 Table of Contents
+- [About the Project](#-about-the-project)
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Hardware Requirements](#-hardware-requirements)
+- [Getting Started](#-getting-started)
+- [Project Structure](#-project-structure)
+- [License](#-license)
+
+---
+
+## 🚀 About the Project
+
+The **Smart Container Box Mobile Application** is a professional, feature-rich Flutter application designed to interface seamlessly with IoT hardware. It provides end-users with real-time telemetry, live video surveillance, and pinpoint GPS tracking of their container boxes from anywhere in the world.
+
+Built with performance and aesthetics in mind, the app features a responsive **Glassmorphism UI**, dynamic dark/light themes, and smooth micro-animations ensuring a premium user experience.
+
+---
 
 ## ✨ Key Features
 
-- **📊 Real-time Dashboard**: Monitor critical container metrics instantly including:
-  - Weight and Bin Fill Level
-  - BMP & DHT Temperatures
-  - Humidity & Pressure
-  - Gas Levels (ppm)
-- **📹 Live Camera Feed**: Directly view the live video stream from the integrated ESP32-CAM.
-- **🗺️ Live GPS Tracking**: Track the container's live location with actual driving route, road distance, and ETA calculation powered by **OSRM**.
-- **🔐 Secure Authentication**: Firebase-backed user authentication system for secure access.
-- **🎨 Premium UI/UX**: Designed with modern aesthetics, fully responsive Dark/Light modes, glassmorphism elements, and smooth micro-animations.
+- **📊 Real-time Telemetry Dashboard** 
+  - Live **Weight & Fill Level** monitoring.
+  - Environmental tracking: **BMP/DHT Temperature**, **Humidity**, and **Pressure**.
+  - Safety sensors: **Gas Level (ppm)** monitoring.
+- **📹 Live Camera Streaming**
+  - Ultra-low latency video stream directly from the **ESP32-CAM** module.
+- **🗺️ Live GPS Tracking**
+  - Integrated with **OSRM** (Open Source Routing Machine) to show accurate driving routes.
+  - Real-time Distance and ETA calculations.
+- **🔐 Secure Access**
+  - Robust authentication powered by **Firebase Auth**.
+- **🎨 Premium UI/UX Design**
+  - Fully responsive, animated interfaces using `flutter_animate`.
 
-## 🛠️ Technology Stack
+---
 
-- **Frontend**: Flutter & Dart
-- **Backend & Database**: Firebase Authentication & Realtime Database
-- **Hardware Integration**: ESP32-CAM, DHT/BMP Sensors, GPS Module, Load Cells
-- **Routing API**: Open Source Routing Machine (OSRM)
+## 🏗️ System Architecture
 
-## 🚀 Getting Started
+The ecosystem relies on three main components communicating in real-time:
+1. **IoT Hardware (Smart Container):** Collects data from sensors (Load Cells, DHT11, BMP280, MQ Gas Sensor, GPS Module) and streams video via ESP32-CAM.
+2. **Cloud Backend (Firebase):** Handles User Authentication and stores live telemetry via Realtime Database.
+3. **Mobile Application (Flutter):** Subscribes to Firebase streams for UI updates and connects directly to the ESP32-CAM IP for video feed.
+
+---
+
+## 🔌 Hardware Requirements
+
+To fully utilize this application, the Smart Container Box should be equipped with:
+- **Microcontrollers**: NodeMCU / ESP8266 & ESP32-CAM
+- **Sensors**: 
+  - Load Cell (with HX711 Amplifier)
+  - DHT11 / DHT22 (Temperature & Humidity)
+  - BMP280 (Pressure & Temperature)
+  - MQ Series Gas Sensor
+  - Neo-6M GPS Module
+
+---
+
+## 🛠️ Getting Started
+
+Follow these instructions to get a copy of the project up and running on your local machine for development and testing.
 
 ### Prerequisites
-- Flutter SDK (latest version)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (latest stable version)
 - Dart SDK
-- Android Studio / VS Code
+- Git
+- IDE (VS Code or Android Studio)
 
 ### Installation
 
-1. **Clone the repository:**
+1. **Clone the repository**
    ```bash
    git clone https://github.com/sahas-hasaranga/Smart-Container-Box-Mobile-Application.git
-   ```
-
-2. **Navigate to the project directory:**
-   ```bash
    cd Smart-Container-Box-Mobile-Application
    ```
 
-3. **Install dependencies:**
+2. **Install dependencies**
    ```bash
    flutter pub get
    ```
 
-4. **Run the application:**
+3. **Configure Firebase**
+   - Place your `google-services.json` file inside `android/app/`.
+   - Update Firebase Configurations in `lib/firebase_options.dart`.
+
+4. **Run the Application**
    ```bash
    flutter run
    ```
 
-## 📸 Screenshots
-*(Add screenshots of your application here)*
+---
+
+## 📂 Project Structure
+
+```text
+lib/
+├── screens/           # UI Screens (Dashboard, Camera, GPS, Auth)
+├── widgets/           # Reusable UI components (Buttons, Cards, Camera Views)
+├── main.dart          # Entry point of the application
+└── firebase_options.dart # Firebase configuration file
+```
+
+---
 
 ## 📄 License
-This project is licensed under the MIT License.
+
+This project is licensed under the **MIT License**. See the `LICENSE` file for more details.
+
+<div align="center">
+  <i>Developed with ❤️ using Flutter & Firebase.</i>
+</div>
