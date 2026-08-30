@@ -57,9 +57,13 @@ Built with performance and aesthetics in mind, the app features a responsive **G
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="assets/screenshot1.png" width="45%" alt="Dashboard Screenshot" />
+  <img src="images/screen1.jpg" width="22%" alt="Screenshot 1" />
   &nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshot2.png" width="45%" alt="Camera Tab Screenshot" />
+  <img src="images/screen2.jpg" width="22%" alt="Screenshot 2" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="images/screen3.jpg" width="22%" alt="Screenshot 3" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="images/screen4.jpg" width="22%" alt="Screenshot 4" />
 </p>
 
 ---
