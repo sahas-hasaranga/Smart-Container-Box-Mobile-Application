@@ -1,135 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:lottie/lottie.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'registration_screen.dart';
-import 'main_screen.dart';
+import 'package:local_auth/local_auth.dart';
+import 'main_navigation_screen.dart';
+import 'signup_screen.dart';
+import '../utils/firebase_initialization_helper.dart';
+import '../services/google_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? prefilledEmail;
+  final String? prefilledPassword;
+
+  const LoginScreen({
+    super.key,
+    this.prefilledEmail,
+    this.prefilledPassword,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _auth = FirebaseAuth.instance;
-  
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final LocalAuthentication _localAuth = LocalAuthentication();
+
+  bool _isPasswordVisible = false;
   bool _isLoading = false;
-  String _errorMessage = '';
-
-  Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please enter both email and password';
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    try {
-      await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = e.message ?? 'An error occurred during login.';
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'An unexpected error occurred.';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  bool _isGoogleSignInInitialized = false;
+  bool _isBiometricAvailable = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeGoogleSignIn();
+    if (widget.prefilledEmail != null && widget.prefilledEmail!.isNotEmpty) {
+      _emailController.text = widget.prefilledEmail!;
+    }
+    if (widget.prefilledPassword != null && widget.prefilledPassword!.isNotEmpty) {
+      _passwordController.text = widget.prefilledPassword!;
+    }
+    _checkBiometrics();
   }
 
-  Future<void> _initializeGoogleSignIn() async {
+  Future<void> _checkBiometrics() async {
     try {
-      await GoogleSignIn.instance.initialize(
-        clientId: '5354461580-mct5ojg4vm4172fdusgjpvv1qm35atfk.apps.googleusercontent.com',
-      );
-      _isGoogleSignInInitialized = true;
+      final bool canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
+      final bool canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
+      if (mounted) {
+        setState(() {
+          _isBiometricAvailable = canAuthenticate;
+        });
+      }
     } catch (e) {
-      debugPrint('Google Sign-In initialization error: $e');
+      debugPrint('Biometrics check error: $e');
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
+  Future<void> _loginWithBiometrics() async {
     try {
-      if (!_isGoogleSignInInitialized) {
-        await _initializeGoogleSignIn();
-      }
-
-      // Note: In google_sign_in v7.2.0, use authenticate() instead of signIn()
-      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
-
-      if (googleUser == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
-      
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      // Request authorization client to get access token if needed by Firebase
-      final authz = await googleUser.authorizationClient?.authorizationForScopes(['email']);
-      
-      final credential = GoogleAuthProvider.credential(
-        accessToken: authz?.accessToken,
-        idToken: googleAuth.idToken,
+      final bool didAuthenticate = await _localAuth.authenticate(
+        localizedReason: 'Authenticate to access container data',
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
       );
-
-      // 4. Once signed in, return the UserCredential
-      await _auth.signInWithCredential(credential);
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = e.message ?? 'A Firebase error occurred during Google Sign-In.';
-      });
+      if (didAuthenticate && mounted) {
+        _goToDashboard();
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'An unexpected error occurred during Google Sign-In: $e';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      debugPrint('Biometrics auth error: $e');
     }
   }
 
@@ -140,207 +79,266 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _goToDashboard() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+    );
+  }
+
+  void _goToSignup() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const SignupScreen()),
+    );
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      if (Firebase.apps.isEmpty) {
+        await FirebaseInitializationHelper.initializeFirebase();
+      }
+
+      if (Firebase.apps.isNotEmpty) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        if (!mounted) return;
+        _goToDashboard();
+      }
+    } catch (e) {
+      debugPrint('Exception during login: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      if (Firebase.apps.isEmpty) {
+        await FirebaseInitializationHelper.initializeFirebase();
+      }
+
+      if (!mounted) return;
+      final credential = await GoogleAuthService.signInWithGoogle(context);
+
+      if (!mounted) return;
+      if (credential != null) {
+        _goToDashboard();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    const facebookBlue = Color(0xFF1877F2);
-
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 20),
-              // App Logo
-              Center(
-                child: Container(
-                  height: 140,
-                  width: 140,
-                  decoration: BoxDecoration(
-                    color: facebookBlue.withOpacity(0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const Icon(
-                        Icons.inventory_2_rounded,
-                        size: 70,
-                        color: facebookBlue,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top Gradient Header Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: LinearGradient(
+                        colors: [
+                          colorScheme.primary,
+                          colorScheme.secondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      Positioned(
-                        top: 30,
-                        right: 30,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.wifi_tethering,
-                            size: 20,
-                            color: Colors.green,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withAlpha(50),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome back',
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(200),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Smart Container',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: facebookBlue,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Revolutionizing container management with IoT and real-time tracking.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.black54,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 40),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'Mobile number or email address',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: facebookBlue, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: facebookBlue, width: 2),
-                  ),
-                ),
-              ),
-              if (_errorMessage.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _errorMessage,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _login,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: facebookBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text(
-                        'Log In',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.grey[400])),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'OR',
-                      style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Smart Container Login',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Access your container analytics and device controls.',
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(200),
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Expanded(child: Divider(color: Colors.grey[400])),
+
+                  const SizedBox(height: 20),
+
+                  // Form Card
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A202E),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withAlpha(20)),
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Email Field
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(color: Colors.white, fontSize: 15),
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(Icons.email_outlined, color: Colors.white.withAlpha(150)),
+                              hintText: 'Email',
+                              hintStyle: TextStyle(color: Colors.white.withAlpha(100)),
+                              filled: true,
+                              fillColor: const Color(0xFF0A0E17),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            validator: (value) => (value == null || !value.contains('@')) ? 'Valid email required' : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Field
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: !_isPasswordVisible,
+                            style: const TextStyle(color: Colors.white, fontSize: 15),
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(Icons.lock_outline_rounded, color: Colors.white.withAlpha(150)),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _isPasswordVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: colorScheme.primary,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isPasswordVisible = !_isPasswordVisible;
+                                  });
+                                },
+                              ),
+                              hintText: 'Password',
+                              hintStyle: TextStyle(color: Colors.white.withAlpha(100)),
+                              filled: true,
+                              fillColor: const Color(0xFF0A0E17),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            validator: (value) => (value == null || value.length < 6) ? 'Min 6 characters required' : null,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Login Button
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 52),
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.surface,
+                            ),
+                            child: _isLoading
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text('Login'),
+                          ),
+                          
+                          if (_isBiometricAvailable) ...[
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: _loginWithBiometrics,
+                              icon: Icon(Icons.fingerprint, color: colorScheme.primary),
+                              label: Text('Login with Biometrics', style: TextStyle(color: colorScheme.primary)),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 52),
+                                side: BorderSide(color: colorScheme.primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                            ),
+                          ],
+                          
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text("Don't have an account? ", style: TextStyle(color: Colors.white.withAlpha(150))),
+                              GestureDetector(
+                                onTap: _goToSignup,
+                                child: Text('Sign up', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: _isLoading ? null : _signInWithGoogle,
-                icon: Image.network(
-                  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
-                  height: 24,
-                  width: 24,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata, size: 24),
-                ),
-                label: const Text(
-                  'Continue with Google',
-                  style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  side: BorderSide(color: Colors.grey[300]!),
-                ),
-              ),
-              const SizedBox(height: 48),
-              OutlinedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RegistrationScreen()),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: facebookBlue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: facebookBlue),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Create new account',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ].animate(interval: 50.ms).fade(duration: 500.ms).slideY(begin: 0.1, end: 0, curve: Curves.easeOutQuad),
+            ),
           ),
         ),
       ),

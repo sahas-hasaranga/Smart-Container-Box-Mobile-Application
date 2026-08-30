@@ -1,4 +1,4 @@
-package com.example.smart_container_app
+package com.example.smart_cb
 
 import io.flutter.embedding.android.FlutterActivity
 

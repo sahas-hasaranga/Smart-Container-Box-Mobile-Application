@@ -1,6 +1,6 @@
 {
-    "name": "smart_container_app",
-    "short_name": "smart_container_app",
+    "name": "smart_cb",
+    "short_name": "smart_cb",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
